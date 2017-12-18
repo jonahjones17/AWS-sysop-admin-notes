@@ -1,0 +1,574 @@
+DNS option set using DHCP
+
+NACL overide security groups layer 3>7
+
+Cannot change instance tenancy after launch (shared hardware or not)
+
+RDS speed up performance (Sharding / Read-replica / Elasticache)
+
+RDS manual backup = no retention / automated default = 1 max = 35
+
+pending snapshots = performance degradation / max = 5
+
+Which cloudwatch metric matters least? // Elasticache CurrConnections < CPI // EBS Throughput // ELB spillover
+
+Elistacache - increased Evictions // Memcached Scale up + more nodes // Redis Scale up
+
+S3 bucket policy deny all overrides all specific
+
+ELB cookie stickiness helps application manage sessions (match app session cookie to ELB, or create new ones)
+
+system status check = stopping/starting + terminate and build a new one
+
+Cloudwatch shows: 1. CPU EC2 / 2. Network traffic EC2 / 3. Disk reads Ec2 ///// NOT ---( Disk usage % EBS )
+
+Higher IOPS for EC2 // 1. EBS optimized instances 2. EBS provisioned IOPS
+
+Access AWS CLI/SDK IAM access key 2 parts 1. Access key ID 2. Secret Access key
+
+EBS + RDS snapshots maintained when instance is terminated
+
+SQS delete 30 days inactivity
+
+Can add AZ's to existing ELB through CLI
+
+Pre warm EBS by accessing each block once
+
+When using SSE-C rotate keys at clien side
+
+To change auto scaling monitoring must create new launch config
+
+You can use block device mapping to specifit instance store volums to attack to an instance when it's launched
+
+S3 create bucket policy to prevent IP block from accessing it
+
+Can construct ELB security groups rather than VPC for application. Web servers filter for X-forwarded-for header
+
+Pre-siged URL's to distribute content from bucket
+
+Absolute tab on cloudwatch
+
+pre-warming is only if load increases suddenly, NOT gradually
+
+RDS does NOT automatically create create snapshots for root valumes
+
+
+
+
+Domain 1 
+
+	Cloud watch
+		in respone
+			1. send notification 
+			2. make changes based on rules
+		Logs stored indefinatley
+		Alarm history 14 days
+		Metrics
+			Only exist in region created
+			Cannot be deleted, expire in 15 days (1 min) 63 (5 min) if no new data is published
+		Namespaces
+			containers for metrics  // ex AWS/EC2, AWS/ELB
+			NO DEFAULT METRIC  - each data element must specify a
+		Dimensions
+			name/value pair to desribe a metric
+		Time Stamp
+		Aggregation
+			Cloudwatch aggregates stats according to period length specific
+			Does not aggregate across regions
+			Only availible with detailed monitoring
+		Alarms
+			invoke actions for sustained state changes (state changed for # of periods)
+			Actions
+				SNS
+				Auto Scaling
+				EC2
+			3 States
+				OK - OK
+				ALARM - outside of defined threshold
+				INSUFFICENT_DATA - just started give it time
+			Region specific (action in same region as alarm)
+			Tested by using - SetAlarmState API / DisabledAlarmActions API
+		Custom Metrics
+			Publish via // CLI = put-metric-data // PutMetricData = API
+			Single data point
+				records average of values every 1 min period
+			Aggregated (statistics set)
+				Can be aggregated before Cloudwatch publish
+				reduces # of call to singled call/minute
+				includ (sum, average, min, max, data sample)
+			Publish 0 instead of no value
+				to have min, and average, total data points
+				monitor health of application
+			Access Cloudwatch via
+				(console, CW CLI, AWS CLI, CW API, AWS SDK)
+	Billing and Cost management
+		Analyze costs w/ graphs - COST EXPLORER
+		Budgets
+			To date charges / estimated charges
+			Cost explorer visulation to show estimaed
+			Can create Cloudwatch alarms / SNS/email for budgets
+			MUST ENABLE "RECEIVING BILLING ALERTS" FOR CW BILLING ALARM
+		Cost Allocation Tags
+			Used to organize resources, track on detailed level
+			1. AWS-generated tags / 2. User-defined tags
+			Must be activated before appear in explorer
+		Programatic Billing (USing your own software)
+			Need to enable
+				1. Programmatic access
+				2. AWS bucket to hold the billing report
+				3. Monthly billing report
+	Consolidated Billing
+		Hooks Linked Accounts to Payer Account
+		One Bill / Easy Tracking / Volume Discount
+		Used best with resource tagging
+		Payer account use MFA
+		Payer account can ONLY view billing details of linked accounts
+		To give Payer access
+			1. Create cross-account roles with full admin permissions
+			2. Grant roles to master (payer) account  Monitoring and Metrics
+Domain 2 / 3
+	ELB
+		Facts
+			Distributed system IS fault tolerant
+			Offload work using SSL termination
+			Integrates w/ autoscaling
+			Not single point of failure
+			Routes to instances that are healthy -> then smallest load
+			Work across AZ within region
+			Timeout = 60 sec
+			Must enable Cross Zone for AZ
+			ELB make health checks vs target groups
+		Scaling ELB
+			Controllers monitors load balance, as traffic changes it scales load
+			AWS HANDLES ELB SCALING (NOT AUTOSCALING)
+			1 - 7 min to scale
+		Pre-Warming ELB
+			works best with gradual increase
+			If expecting flash traffic spike contact AWS to pre-warm
+		DNS
+			when scaled ELB with update DNS with new private IP's
+			TTL 60 sec
+		Internet / Internal for public/pri subnets
+		AZ/Subnet
+			Allows subnets to be added, adds node to each AZ
+			one subnet/AZ attached to ELB
+			/27 minimum ELB uses 8 IP's
+		Security/NACL
+			Allow inbound on listener port
+			Allow outbound on listener port + healthcheck port
+			NACL allow ephemeral ports
+			EC2 allow incoming from ELB
+		SSL
+			Security policy = SSL protcol + SSL cipher + server order preference
+			can create custom security policy
+		Health checks
+			Sends pings, connections, requests
+			InService = healthy
+			OutofService = unhealthy
+		Listeners
+			Checks for connection requests
+			Protocol + port for front end
+			Protocol + port for back end
+			HTTP/S TCP + SSL
+			X.509 cert to decrypt send to back end instances
+			SSL but NOT TERMINATE use Client --TCP-- ELB --SSL-- Ec2 and use certs on backend
+			Does NOT SUPPORT client-side SSL certs
+		X forwarded Headers + Proxy Protocol
+			X-forwarded headers help back end servers track stuff using HTTP
+				1. IP of client
+				2. Protocol of client
+				3. Port of client
+			Proxy protocol when NOT using HTTP
+				1. adds header with all that stuff in human readable format
+		Connection Draining
+			If deregistered/unhealthy keeps it alive
+			up to 60 min // 5 is default
+			Autoscaling waits for this to expire before spin down
+		Sticky Sessions
+			Duration based
+				Cookie made by ELB if one doesn't exist
+				Policy config defines cookie TTL
+			Application controlled
+				Special cookie to link session with instance handled reques
+				Changes cookie if new request in policy
+				If one goes down, new cookie is stuck on new instance
+		DELETION DOES NOT AFFECT INSTANCES REGISTERED WITH ELB
+	Auto Scaling
+		Facts
+			+ fault tolerance + High Availibility
+			Distributes evenly between AZ's
+			Can be associated with ELB to use ELB health checks
+			EIP's must associated with new instances manually when terminated
+			EBS must be attached to new instance manually when terminated
+			Can perform heathchecks
+		Launch Config
+			Template used to launch EC2
+				Selection of
+					AMI
+					Instance Type
+					Key Pair
+					Security Groups
+					Block device mapping
+				CANNOT BE MODIFIED AFTER CREATION
+				Basic or detailed monitoring selected on creation
+		Auto Scaling Group
+			Consists of
+				Launch Config
+				Min/Max capacity
+				Desired Capacirty
+				AZ or Subnet
+				Metrics + health checks
+					In state other than running
+					Status is impaired
+					Reports as OutOfService
+			Starts by launching Desired capacity, maintains by performing health checks
+			Multi AZ (NOT multi regio)
+			Can merge single zone (Single Zone --> Multi zone) As long as one of multi zone has the single one
+				update-auto-scaling-group
+			Changing Launch config affect NEW INSTANCES, not EXISTING ONES IN GROUP
+		Manual Scaling
+			Changing desired capacity
+			Attaching/Detaching instances
+				Can only be done if instance is running
+				AMI still exists
+				Not a memeber of another autoscaling group
+				Instance same AZ as Auto Scaling group
+				Same VPC as ELB
+			Can Decrement desired capacity by # being detached
+			If Attched + desired >= Max then Attach fails
+		Scheduled Scaling
+			Gaurentees execution order
+			Multiple Scheduled actions must have UNIQUE TIMES VALUE or leads to rejection
+			Doesn't require max size
+		Dynamic Scaling
+			Alarms + policies to determine conditions
+			CloudWatch
+		Multiple policies
+			Allowed 1. In 2. Out
+			If overlapping picks one with greated impact
+		Autoscaling coodown
+			default 300 seconds
+			Does not use cooldown for unhealthy instances
+		Termination Policy
+			Default
+				1. Selection of AZ
+					1. Most instances
+					2. Oldest Launch Config
+				2 Which instance
+					1. oldest launch config
+					2. closest to next billing hour
+					3. random
+			Can create custom policies with metrics
+			To terminate from CLI place min to 0
+			Can provide instance protection to IMPORTANT instances
+				Does not protect manual deletion
+				Does not protect failed health checks
+		Standy State
+			Not servicing reuqests but in group used to troubleshoot
+			Decrements the desired capacity to not launch new instance
+			Deregistered from ELB
+		Suspenion
+			Process include
+				Launch
+				Terminate
+				Health Check
+				ReplaceUnhealthy
+				AlarmNotification
+				ScheduledActions
+				AddtoLoadBalancer
+				AZRebalance
+			Goes to pending once restarted
+	Auto Scaling + ELB
+		Can add ELD to auto scaling group
+		ELB register EC2 and routes to eth0
+		Can be used with connection draining
+		Sends data to cloudwatch for monitoring
+	RDS Multi AZ + Read Replicas
+		Multi-AZ deployment
+			RDS provisions and manages a SYNCHRONOUS standby in different AZ
+			RDS failsover to  standby CNAME changed to route traffic
+			CANT BE USED TO SERVE READ TRAFFIC
+			When single --> multi
+				1. RDS take snapshot of primary DB
+				2. restores snapshot to other AZ
+				3. Sets up synchronous replication
+			Only be alerted if SNS is configured
+
+		Read Replica
+			Asynchrounously copied data
+			5 / source DB
+			Automatic backups must be enabled on source DB
+			Creates from snapshot
+			Snapshots can be taken from standby multi-AZ
+			Can be promoted to full DB
+			If source is deleted Read replica promoted to full DB
+			Can be created in other regions
+			Can make read replica from other read replica (MySQL)
+	Troubleshooting
+		EC2
+
+			System status check
+				Physical check
+					EBS - STOP AND RESTART
+					INSTANCE STORE - TERMINATE AND LAUNCH REPLACEMENT
+				Instance Status check
+					Instance/VM
+						rebooting
+			Routing
+				Security Group needs rule in
+				rule in and out
+		Autoscaling
+				1. AMI/Name id not exist/still pending
+				2. Security group does not exist
+				3. key pair not exist
+				4. Autoscaling group not found
+				5. Invalid EBS block mapping
+				6. Capacity limit reached
+		ELB
+			Metrics
+				Healthyhost / Unhealthyhost
+				RequestCount - 1 or 5 min intervals
+				Latency
+				SurgeQueueLength - total requests pending routing
+					Max size is 1024 then requests rejected
+				SpilloverCount - request rejected to Queue full
+			Access Logs
+				Things sent to load balancer
+				stores in S3 bucket
+				No fee, only storage
+			CloudTrail logs
+				Used to monitor ALL API calls
+				S3 Troubleshooting / Availibility
+Domain 4 Deployment
+	CloudFormation
+		Template
+			JSON or YAML
+			Must have resources
+			Automatic rollback on error
+			Waitcondition for resources waiting on other
+		Stack
+			Manages templates as single unit
+			Change Sets let you see how the stack will update
+Domain 5 Data Management
+Domain 6 Security
+	IAM
+		Account Root user
+			Do not share root account/use it, ceate seperate full admin account
+			Email/pw to login
+			MFA on root/admin users
+		Users
+			Create individual users
+			least privilage
+			After creating new user must create set of Access keys for the user
+			When you delete a user it also deletes signing certs/access keys of the user
+		Groups
+			use to assign permissions
+			cannot be nested
+			must detach users to delete
+		Audits
+			perform credential report to list all users/permissions
+			use to look at pw/access key rotation
+		Roles
+			TRUST POLICY = ALLOWS EC2 TO ASSUME EC2 INSTANCE ROLE
+			ACCESS POLICY = EC2 ROLE TO ACCESS OBJECTS
+			Use roles for applications running on Ec2
+			Delegate using roles instead of credentials
+			Temporary access
+		STS
+			creates temporary security credentials to access over AWS resources
+			global service with regional endpoint
+			can last minutes to hours
+			2 Identity providers (SAML, OpenID connect)
+		Service roles
+			EC2 talking to S3 resources communicating
+			Instance profile
+				container for an IAM role you can use to pass role information to EC2 before it starts
+				Can only contain one role/profile but 1 role can be in multiple profiles
+	EC2 Security
+		Security groups
+			Control inbound traffic
+			associated with network interfaces
+			Default group allows from other instances in VPC
+			Cannot create deny rules always permissive
+		IAM
+			Allows or deny actions on resources
+			NOT WHO CAN LOGIN into INSTANCES
+	S3 Security
+		Facts
+			Redundent storage across the region
+			regularly verifies intgrity using checksums
+		Data at rest
+			Server side
+				Data at rest
+				only object data, not metadata
+				With SSE-S3(S3 managed keys)
+					Each object encrypted with unique data key
+					Encrypts also with master key
+					AES 256
+				With SSE-KMS(Key management service)
+					Uses CMK (Customer master keys)
+					Master key is never made availible
+					allows keys to be temporarily disabled / re-enabled
+					ALL DONE AUTOMATICALLY NO NEED ON YOUR END
+					Can create your own CMK to do all stuff
+				With SSE-C(Server Side)
+					Done through https
+					stores hash of key sent
+			Client Side
+				CMK
+					provide the CMK id to the client to encrpyt the daya
+					sends cipher blob through KMS to get plain text version to send and unencrpyt
+				Client Side master key
+					AWK SDK or AmazonS3EncryptionClient generates one time use symmetric key
+					customer encrypts this with master key
+					uses dataencryptionkey to encrypt data of single S3 object
+					uploads object, and dataencryptionkey as metadata
+	RDS Security
+		Encryption
+			AES 256
+			Does Logs/Snapshots/Automated backups/Read Replicas
+			Can go unencrypted snapshot -> encrypted
+			Encrypted snapshots restore to encrypted DB
+			Encrypted snapshots cannot be sent to other regions
+		SSL
+			In transit
+			RDS creates cert
+			compute intensive
+	Storage Gateway
+		Facts
+			Uses SSL, AES 256
+			EC2 instance or on-premise VM
+		Volume Gateways
+			Cached
+				mount as iSCSI(Internet Small Computer System Interface)
+				Data is stored in S3
+				Gateway retains copy of recently read data
+				Gateway-cached can be backed up taking snapshots
+			Stored
+				Maintained locally
+				off site backups into S3
+				Way more storage than cached
+	S3
+		Facts
+			Objects
+			Key/Value/Metadata/VersionID/Accesscontrolinfo
+			durable aka backed up
+		Uploads
+			5gb max put
+			multi part upload for greater 5
+			pre-signed URL for upload
+		Copying
+			across locations / multiple copies
+			5gb max
+		Deleting
+			versioned
+				inserts delete marker, and becomes non-current
+				if object key with version ID is provided it's permantly gone
+			Add MFA for more protection!
+		Pre-Signed URL
+			allow download/upload without credentials
+			goes off creators security credentials
+			have experation time/date
+		Multi-Part Upload
+			5mb - 5gb
+			parralel = increased throughput
+			pause and resume
+		Permissions!
+			User Access Policy (IAM)
+			Resource policies
+				Bucket Policies
+					Cross Account access IE
+					others AWS account, or IAM users in other accounts
+					Add/deny permissions across all or a subst of objects
+				NACL
+					Other AWS accounts
+					can't be granular on permissions (PUT or GET)
+					Based off CNAME or email of other AWS accounts
+					Only way to grany necessary permissions to log delivary group is via a bucket ACL
+					OBJECT ACL - only was for non-account owner to manage object permissions
+					OBJECTS/BUCKET can have ACL but not folders
+
+
+
+
+
+
+
+
+Domain 7 Networking
+	VPN
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		
+
+
+
+
+
+
+
+
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Domain 5
+	BACKUPS // 
+
+		RDS automated backups
+	deleted if instance is
+	Snapshots are not
+
+		EBS NO AUTOMATED BACKUPS
+	 snapshots stored on S3
+	 incremental
+	 region specific
+	 can create volume from snapshot
+
+
+
+
+
+
+
